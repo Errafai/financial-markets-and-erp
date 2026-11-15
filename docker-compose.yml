@@ -1,0 +1,89 @@
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-odoo}
+      POSTGRES_USER: ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - erp_network
+
+  odoo:
+    image: odoo:17.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HOST: db
+      PORT: 5432
+      USER: ${POSTGRES_USER:-odoo}
+      PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+    volumes:
+      - odoo_data:/var/lib/odoo
+      - ./odoo_addons:/mnt/extra-addons:ro
+    ports:
+      - "127.0.0.1:${ODOO_PORT:-8069}:8069"
+    networks:
+      - erp_network
+
+  python:
+    build:
+      context: .
+      dockerfile: docker/python/Dockerfile
+    restart: unless-stopped
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: ["sh", "-c", "python -m src.synthetic_data --if-missing && tail -f /dev/null"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import numpy, pandas, arch, statsmodels"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - erp_network
+
+  jupyter:
+    build:
+      context: .
+      dockerfile: docker/python/Dockerfile
+    restart: unless-stopped
+    working_dir: /workspace
+    depends_on:
+      python:
+        condition: service_healthy
+    volumes:
+      - .:/workspace
+    environment:
+      JUPYTER_TOKEN: "${JUPYTER_TOKEN:?Set JUPYTER_TOKEN in .env}"
+    command:
+      - jupyter
+      - lab
+      - --ip=0.0.0.0
+      - --port=8888
+      - --no-browser
+      - "--ServerApp.token=${JUPYTER_TOKEN:?Set JUPYTER_TOKEN in .env}"
+      - --ServerApp.root_dir=/workspace
+    ports:
+      - "127.0.0.1:${JUPYTER_PORT:-8888}:8888"
+    networks:
+      - erp_network
+
+networks:
+  erp_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  odoo_data:
