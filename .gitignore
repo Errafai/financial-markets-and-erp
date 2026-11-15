@@ -1,0 +1,31 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Jupyter runtime state (notebooks themselves are tracked)
+.ipynb_checkpoints/
+.jupyter/
+
+# Local databases, logs, and generated figures
+*.sqlite3
+*.log
+outputs/
+
+# Keep the reproducible academic dataset tracked; exclude only ad-hoc raw imports.
+data/raw/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
