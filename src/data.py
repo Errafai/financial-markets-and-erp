@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from src.config import BANKS, SYNTHETIC_DATA_DIR, SYNTHETIC_LABEL
+from src.real_data import load_real_dataset
 from src.synthetic_data import save_synthetic_data
 
 
@@ -71,6 +72,15 @@ def load_synthetic_dataset(
     if "stress_period" not in frames[3].columns:
         raise ValueError("Combined synthetic dataset is missing the stress-period flag.")
     return frames  # type: ignore[return-value]
+
+
+def load_market_dataset(
+    data_dir: Path | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Load the repository's real canonical market dataset."""
+    from src.config import REAL_DATA_DIR
+
+    return load_real_dataset(REAL_DATA_DIR if data_dir is None else data_dir)
 
 
 def load_returns_csv(path: Path) -> pd.DataFrame:

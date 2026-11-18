@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.config import SYNTHETIC_LABEL
+from src.config import REAL_LABEL
 
 
 def export_indicators(
-    indicators: pd.DataFrame, output_dir: Path, *, stem: str = "synthetic_financial_results"
+    indicators: pd.DataFrame, output_dir: Path, *, stem: str = "real_financial_results"
 ) -> tuple[Path, Path]:
     """Export synthetic analysis results to CSV and JSON with explicit provenance."""
     if indicators.empty:
@@ -20,7 +20,7 @@ def export_indicators(
     frame = indicators.copy()
     if frame.index.name or isinstance(frame.index, pd.DatetimeIndex):
         frame = frame.reset_index()
-    frame["data_status"] = SYNTHETIC_LABEL
+    frame["data_status"] = REAL_LABEL
     for column in frame.columns:
         if column.lower() in {"date", "datetime"} and pd.api.types.is_datetime64_any_dtype(
             frame[column]
