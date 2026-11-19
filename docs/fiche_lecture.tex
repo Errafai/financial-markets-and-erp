@@ -1,0 +1,321 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  urlcolor=blue!60!black,
+  pdftitle={Fiche de lecture - Risque systémique et Early Warning System},
+  pdfauthor={Groupe 10}
+}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible,
+  showstringspaces=false
+}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{1cm}
+  {\Large \textbf{Université Cadi Ayyad}\par}
+  \vspace{0.3cm}
+  {\large École Nationale des Sciences Appliquées de Safi\par}
+  \vspace{0.3cm}
+  {\large Filière G.INFO et IDIA\par}
+  \vfill
+  {\Huge \textbf{Fiche de lecture}\par}
+  \vspace{0.5cm}
+  {\LARGE Risque Systémique \& Early Warning System (CoVaR)\par}
+  \vspace{0.8cm}
+  {\large Groupe 10\par}
+  \vfill
+  \begin{tabular}{ll}
+    CHAFIK Mouad & ERRAFAI Achraf \\
+    MARZAQ Jihane & NADIR Safaa \\
+    Encadrant : M. JRAIFI & Année : 2026--2027
+  \end{tabular}
+  \vfill
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+\section{Objet de la fiche}
+
+Cette fiche présente le cadre mathématique et logiciel du projet
+\emph{Risque Systémique \& Early Warning System (CoVaR)}. L'objectif est de mesurer le risque
+individuel des banques, leur contribution au risque systémique et les changements atypiques de
+la structure de dépendance entre établissements.
+
+Le pipeline actif exploite cinq séries réelles issues des fichiers locaux
+\texttt{old-erp/data/raw/} : Attijariwafa Bank (ATW), Banque Centrale Populaire (BCP), Bank of
+Africa (BOA), CIH Bank (CIH) et Crédit du Maroc (CDM). Les données sont normalisées dans
+\texttt{data/real/}, avec des prix de clôture alignés sur les dates communes. Le jeu synthétique
+historique est conservé séparément et n'est pas mélangé aux observations réelles.
+
+\section{Cadre mathématique}
+
+\subsection{Rendement logarithmique}
+
+Pour une banque $i$ et deux dates consécutives, le rendement logarithmique est défini par :
+\[
+  r_{i,t}=\ln\left(\frac{P_{i,t}}{P_{i,t-1}}\right),
+\]
+où $P_{i,t}$ désigne le prix de clôture. Les rendements sont calculés après alignement des dates
+communes entre les cinq banques.
+
+\subsection{Value at Risk}
+
+La VaR au niveau $q$ est le quantile inférieur de la distribution des rendements :
+\[
+  \mathbb{P}\left(X_{i,t}\leq \mathrm{VaR}_{q,t}^{i}\right)=q.
+\]
+Dans l'implémentation historique, la mesure de perte est calculée par
+$-\operatorname{quantile}_q(r_i)$. Sous hypothèse normale, la VaR paramétrique s'écrit :
+\[
+  \mathrm{VaR}_{q}^{i}
+  =-\left(\mu_i+\Phi^{-1}(q)\sigma_i\right),
+\]
+où $\Phi^{-1}$ est le quantile de la loi normale centrée réduite.
+
+\subsection{CoVaR}
+
+La CoVaR mesure le quantile conditionnel du rendement systémique lorsque la banque $i$ est dans
+un état donné :
+\[
+  \mathbb{P}\left(
+  X_{\mathrm{sys},t}\leq
+  \mathrm{CoVaR}_{q,t}^{\mathrm{sys}|i}
+  \,\middle|\,
+  X_{i,t}=\mathrm{VaR}_{q,t}^{i}
+  \right)=q.
+\]
+Le rendement systémique est construit comme la moyenne équipondérée des rendements des banques
+hors institution étudiée, afin d'éviter une relation mécanique partie--tout.
+
+\subsection{\texorpdfstring{$\Delta$CoVaR}{Delta CoVaR}}
+
+La contribution marginale au risque systémique est :
+\[
+  \Delta\mathrm{CoVaR}_{t}^{\mathrm{sys}|i}
+  =
+  \mathrm{CoVaR}_{q,t}^{\mathrm{sys}|i,\text{détresse}}
+  -
+  \mathrm{CoVaR}_{q,t}^{\mathrm{sys}|i,\text{médiane}}.
+\]
+Une valeur plus négative indique une détérioration plus forte du rendement systémique lorsque
+la banque passe de l'état de référence à l'état de détresse. Cette mesure est une association
+conditionnelle et non une preuve de causalité.
+
+\subsection{Régression quantile}
+
+La CoVaR est estimée à partir de la régression quantile :
+\[
+  X_{\mathrm{sys},t}
+  =
+  \alpha_q+\gamma_qX_{i,t}+\varepsilon_t.
+\]
+La prédiction conditionnelle au niveau de la VaR bancaire est alors :
+\[
+  \mathrm{CoVaR}_{q}^{\mathrm{sys}|i}
+  =
+  \alpha_q+\gamma_q\mathrm{VaR}_{q}^{i}.
+\]
+La référence médiane remplace la VaR de détresse par le quantile 50\,\%.
+
+\section{Modèles de volatilité et de dépendance}
+
+\subsection{GARCH(1,1) univarié}
+
+Chaque banque est modélisée séparément par :
+\[
+  h_{i,t}
+  =
+  \omega_i+\alpha_i\varepsilon_{i,t-1}^{2}
+  +\beta_i h_{i,t-1},
+\]
+avec :
+\[
+  \omega_i>0,\qquad
+  \alpha_i\geq 0,\qquad
+  \beta_i\geq 0,\qquad
+  \alpha_i+\beta_i<1.
+\]
+Les résidus standardisés sont définis par :
+\[
+  z_{i,t}=\frac{\varepsilon_{i,t}}{\sqrt{h_{i,t}}}.
+\]
+Les ajustements non convergents ou non admissibles sont rejetés explicitement avant l'étape
+multivariée.
+
+\subsection{DCC-GARCH}
+
+Les résidus standardisés des cinq modèles GARCH forment le vecteur $\mathbf{z}_t$. La matrice
+de covariance inconditionnelle est :
+\[
+  \overline{Q}
+  =
+  \frac{1}{T}\sum_{t=1}^{T}\mathbf{z}_t\mathbf{z}_t^\top.
+\]
+La récursion DCC est :
+\[
+  Q_t
+  =
+  (1-a-b)\overline{Q}
+  +a\mathbf{z}_{t-1}\mathbf{z}_{t-1}^{\top}
+  +bQ_{t-1},
+\]
+avec :
+\[
+  a\geq0,\qquad b\geq0,\qquad a+b<1.
+\]
+La matrice de corrélation conditionnelle est obtenue par normalisation :
+\[
+  R_t
+  =
+  \operatorname{diag}(Q_t)^{-1/2}
+  Q_t
+  \operatorname{diag}(Q_t)^{-1/2}.
+\]
+Les matrices $R_t$ sont symétriques, de diagonale unitaire et doivent rester définies positives.
+Elles représentent une dépendance conditionnelle dynamique, et non une relation causale.
+
+\section{Détection d'anomalies par autoencodeur}
+
+Pour les cinq banques, la partie triangulaire supérieure stricte de $R_t$ contient :
+\[
+  \frac{5(5-1)}{2}=10
+\]
+corrélations uniques. Le vecteur d'entrée est noté $\mathbf{x}_t\in\mathbb{R}^{10}$.
+
+L'encodeur produit une représentation latente :
+\[
+  \mathbf{z}_t=f_{\theta}(\mathbf{x}_t),
+\]
+puis le décodeur reconstruit :
+\[
+  \widehat{\mathbf{x}}_t=g_{\phi}(\mathbf{z}_t).
+\]
+L'architecture implémentée suit la structure dense :
+\[
+  10\rightarrow8\rightarrow5\rightarrow3
+  \rightarrow5\rightarrow8\rightarrow10,
+\]
+avec des activations ReLU dans les couches cachées.
+
+L'apprentissage est effectué uniquement sur la fenêtre chronologique considérée comme normale.
+Le score d'anomalie quotidien est l'erreur quadratique moyenne :
+\[
+  s_t
+  =
+  \frac{1}{10}\sum_{j=1}^{10}
+  (x_{t,j}-\widehat{x}_{t,j})^2.
+\]
+Le seuil d'alerte est le 99e percentile des scores du régime normal :
+\[
+  \tau_{0.99}=Q_{0.99}(s_t),
+  \qquad
+  \mathrm{Alerte}_t=\mathbb{1}_{\{s_t>\tau_{0.99}\}}.
+\]
+Ce signal complète la VaR, la CoVaR et la $\Delta$CoVaR ; il ne remplace pas leur interprétation
+économique ou leur validation humaine.
+
+\section{Architecture Odoo et intégration}
+
+Le dépôt contient actuellement l'addon \texttt{cours\_derives/}, issu du TP 0. Les indicateurs
+Early Warning issus du pipeline Python pourront être ajoutés dans cet addon ou dans un module
+complémentaire dépendant :
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{p{0.35\textwidth}p{0.52\textwidth}}
+    \toprule
+    \textbf{Élément} & \textbf{Rôle} \\
+    \midrule
+    \texttt{cours.derives.banque} (proposé) &
+    Données par banque, ticker, VaR, CoVaR et $\Delta$CoVaR. \\
+    \texttt{cours.derives.indicateur} (proposé) &
+    Date, corrélation moyenne, CoVaR systémique, score d'anomalie et niveau d'alerte. \\
+    \texttt{option\_id} &
+    Lien facultatif vers une option du module \texttt{cours\_derives}. \\
+    Module \texttt{mail} &
+    Support des activités et notifications lors d'une alerte importante. \\
+    \bottomrule
+  \end{tabular}
+  \caption{Structures proposées pour l'intégration Early Warning}
+\end{table}
+
+La hiérarchie fonctionnelle peut être organisée ainsi :
+
+\begin{lstlisting}
+Derives
+|-- Forwards
+|-- Options
+`-- Early Warning
+    |-- Banks
+    `-- Indicators
+\end{lstlisting}
+
+Le flux de données est :
+\[
+\text{CSV réels}
+\rightarrow
+\text{rendements}
+\rightarrow
+\text{GARCH}
+\rightarrow
+\text{DCC-GARCH}
+\rightarrow
+\text{VaR/CoVaR/autoencodeur}
+\rightarrow
+\text{indicateurs Odoo}.
+\]
+
+Chaque alerte doit conserver sa date, son score, le seuil appliqué, le niveau de criticité et la
+version du modèle. Cette traçabilité permet de reproduire la décision et de distinguer les
+alertes quantitatives des validations métier.
+
+\section{Hypothèses et limites}
+
+\begin{enumerate}
+  \item Les cinq banques sont représentées par des rendements de clôture alignés sur les dates
+        communes.
+  \item Les paramètres GARCH et DCC sont estimés sur l'échantillon disponible ; une évaluation
+        prédictive exige une séparation stricte entre calibration et test.
+  \item Les corrélations conditionnelles ne démontrent pas une causalité entre établissements.
+  \item Le seuil au 99e percentile est empirique et dépend du régime normal choisi.
+  \item Une alerte d'autoencodeur signale une reconstruction atypique, mais n'identifie pas
+        automatiquement la cause économique du changement.
+  \item Les résultats doivent être combinés avec les indicateurs de volatilité, de pertes
+        extrêmes et avec l'analyse humaine avant toute décision opérationnelle.
+\end{enumerate}
+
+\section{Conclusion}
+
+La chaîne CoVaR combine une modélisation de volatilité individuelle, une dépendance dynamique
+DCC-GARCH et une détection non supervisée des anomalies. L'autoencodeur fournit un score continu
+sur la structure des corrélations des cinq banques, tandis que le seuil empirique facilite son
+intégration dans un tableau de bord Early Warning.
+
+L'étape suivante consiste à automatiser l'import périodique des scores dans
+\texttt{cours\_derives.indicateur}, à définir des niveaux vert--orange--rouge et à relier les alertes
+aux activités Odoo. Une surveillance de la dérive du modèle devra également être mise en place
+pour réestimer le seuil lorsque la structure du marché évoluera durablement.
+
+\end{document}
